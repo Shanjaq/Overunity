@@ -200,8 +200,6 @@ namespace Overunity
 
         private void ListView_MouseClick(object sender, MouseEventArgs e)
         {
-            string id = "xxx";//extra value
-
             if (e.Button == MouseButtons.Right)
             {
                 if (lvPlugins.FocusedItem != null && lvPlugins.FocusedItem.Bounds.Contains(e.Location) == true)
