@@ -20,7 +20,7 @@ namespace Overunity.Handlers
             tblTmp.ReadXmlSchema(sReader);
 
             DataRow row = tblTmp.NewRow();
-            row["Plugin Name"] = new FileInfo(filePath).Name;
+            row["PluginName"] = new FileInfo(filePath).Name;
             tblTmp.Rows.Add(row);
 
             tblTmp.AcceptChanges();

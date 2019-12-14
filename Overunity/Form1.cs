@@ -22,7 +22,7 @@ namespace Overunity
         DataView dvActivePlugins;
         string strPluginTable_Schema = "";
 
-        List<Tuple<string, string, IHandler>> fileImportHandlers = new List<Tuple<string, string, IHandler>>();
+        List<Tuple<string, string, IHandler>> fileHandlers = new List<Tuple<string, string, IHandler>>();
 
         public Form1()
         {
@@ -56,11 +56,13 @@ namespace Overunity
         private void Data_Init()
         {
             DataTable dtActivePlugins = new DataTable("ActivePlugins");
-            dtActivePlugins.Columns.Add("Plugin Name", typeof(string));
-            dtActivePlugins.Columns.Add("Date Modified", typeof(DateTime));
-            dtActivePlugins.Columns.Add("Author", typeof(string));
-            dtActivePlugins.Columns.Add("Size", typeof(int));
             dtActivePlugins.Columns.Add("Priority", typeof(int));
+            dtActivePlugins.Columns.Add("FullPath", typeof(string));
+            dtActivePlugins.Columns.Add("PluginName", typeof(string));
+            dtActivePlugins.Columns.Add("DateModified", typeof(DateTime));
+            dtActivePlugins.Columns.Add("Size", typeof(int));
+            dtActivePlugins.Columns.Add("Author", typeof(string));
+            dtActivePlugins.Columns.Add("Description", typeof(int));
 
             dsPlugins.Tables.Add(dtActivePlugins);
 
@@ -70,13 +72,19 @@ namespace Overunity
 
             // Create a LinqDataView from a LINQ to DataSet query and bind it 
             // to the Windows forms control.
-            EnumerableRowCollection<DataRow> pluginsQuery = from row in dtActivePlugins.AsEnumerable()
-                                                            where row.Field<string>("Plugin Name") != null
-                                                            orderby row.Field<string>("Plugin Name")
-                                                            select row;
+            /*EnumerableRowCollection<DataRow> pluginsQuery = from row in dtActivePlugins.AsEnumerable()
+                                                            where row.Field<string>("PluginName") != null
+                                                            orderby row.Field<string>("PluginName")
+                                                            select row;*/
+
+            EnumerableRowCollection<DataRow> pluginsQuery = dtActivePlugins.AsEnumerable()
+                .Where<DataRow>(x => x.Field<string>("PluginName") != null)
+                .OrderBy(y => y.Field<string>("PluginName"))
+                .Select(y => y);
+
             dvActivePlugins = pluginsQuery.AsDataView();
 
-            fileImportHandlers = new List<Tuple<string, string, IHandler>>() {
+            fileHandlers = new List<Tuple<string, string, IHandler>>() {
                 Tuple.Create( ".esp", "Plugin", (IHandler)new PluginHandler()),
                 Tuple.Create( ".esm", "Master", (IHandler)new PluginHandler()),
                 Tuple.Create( ".ess", "Save", (IHandler)new SaveHandler())
@@ -94,7 +102,7 @@ namespace Overunity
                 Size = new System.Drawing.Size(245, 200),
                 GridLines = true,
                 AllowColumnReorder = true,
-                LabelEdit = true,
+                LabelEdit = false,
                 FullRowSelect = true,
                 Sorting = SortOrder.Ascending,
                 View = View.Details,
@@ -152,11 +160,11 @@ namespace Overunity
                 string[] files = (string[])e.Data.GetData(DataFormats.FileDrop);
                 try
                 {
-                    files = files.Where(x => fileImportHandlers.Select(y => y.Item1.ToString()).Contains(x.Substring(x.Length - 4, 4))).ToArray();
+                    files = files.Where(x => fileHandlers.Select(y => y.Item1.ToString()).Contains(x.Substring(x.Length - 4, 4))).ToArray();
                     foreach(string file in files)
                     {
 
-                        DataTable imported_files = fileImportHandlers.Where(x => file.Substring(file.Length - 4, 4) == x.Item1).First().Item3.Import(file, strPluginTable_Schema);
+                        DataTable imported_files = fileHandlers.Where(x => file.Substring(file.Length - 4, 4) == x.Item1).First().Item3.Import(file, strPluginTable_Schema);
                         foreach (DataRow dr in imported_files.Rows)
                         {
                             dsPlugins.Tables["ActivePlugins"].ImportRow(dr);
