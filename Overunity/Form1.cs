@@ -17,7 +17,7 @@ namespace Overunity
     {
         ListView lvPlugins;
 
-        DataSet dsActivePlugins = new DataSet();
+        DataSet dsPlugins = new DataSet();
         DataView dvActivePlugins;
         string strPluginTable_Schema = "";
 
@@ -37,20 +37,11 @@ namespace Overunity
             dtActivePlugins.Columns.Add("Size", typeof(int));
             dtActivePlugins.Columns.Add("Priority", typeof(int));
 
-            dsActivePlugins.Tables.Add(dtActivePlugins);
+            dsPlugins.Tables.Add(dtActivePlugins);
 
             StringWriter sWriter = new StringWriter();
             dtActivePlugins.WriteXmlSchema(sWriter);
             strPluginTable_Schema = sWriter.GetStringBuilder().ToString();
-
-            //test data
-            for (int i = 0; i < 10; i++)
-            {
-                DataRow row = dtActivePlugins.NewRow();
-                row["Plugin Name"] = "blargh " + i;
-                dtActivePlugins.Rows.Add(row);
-            }
-            dtActivePlugins.AcceptChanges();
 
             // Create a LinqDataView from a LINQ to DataSet query and bind it 
             // to the Windows forms control.
@@ -62,8 +53,8 @@ namespace Overunity
 
             lvPlugins = new ListView
             {
-                Location = new System.Drawing.Point(12, 12),
-                Name = "ListView1",
+                Name = "ListView_Plugins",
+                Location = new System.Drawing.Point(0, 0),
                 Size = new System.Drawing.Size(245, 200),
                 GridLines = true,
                 AllowColumnReorder = true,
@@ -72,11 +63,15 @@ namespace Overunity
                 Sorting = SortOrder.Ascending,
                 View = View.Details,
                 HeaderStyle = ColumnHeaderStyle.Clickable,
-                AllowDrop = true
+                AllowDrop = true,
+                Anchor = AnchorStyles.Top | AnchorStyles.Right | AnchorStyles.Bottom | AnchorStyles.Left,
+                Dock = DockStyle.Fill
             };
 
             lvPlugins.DragDrop += new DragEventHandler(ListView_DragDrop);
             lvPlugins.DragEnter += new DragEventHandler(ListView_DragEnter);
+            lvPlugins.ColumnClick += new ColumnClickEventHandler(ListView_ColumnClick);
+            lvPlugins.Resize += new EventHandler(ListView_Resize);
 
 
             foreach (DataColumn dc in dtActivePlugins.Columns)
@@ -84,7 +79,20 @@ namespace Overunity
                 lvPlugins.Columns.Add(dc.Caption);
             }
 
-            Controls.Add(lvPlugins);
+            //Controls.Add(lvPlugins);
+
+            Panel pMain = new Panel
+            {
+                Name = "Panel_Main",
+                Location = new System.Drawing.Point(0, 0),
+                Size = new System.Drawing.Size(245, 200),
+                Anchor = AnchorStyles.Top | AnchorStyles.Right | AnchorStyles.Bottom | AnchorStyles.Left,
+                Dock = DockStyle.Fill,
+                Padding = new Padding(0, 0, 0, 64)
+            };
+
+            Controls.Add(pMain);
+            pMain.Controls.Add(lvPlugins);
 
             int j = 0;
             j += 1;
@@ -102,6 +110,8 @@ namespace Overunity
 
         void ListView_Update()
         {
+            lvPlugins.BeginUpdate();
+            lvPlugins.Items.Clear();
             foreach (DataRow dr in dvActivePlugins.ToTable().Rows)
             {
                 ListViewItem lvi = new ListViewItem(dr.ItemArray.First().ToString());
@@ -117,7 +127,8 @@ namespace Overunity
 
                 lvPlugins.Items.Add(lvi);
             }
-            lvPlugins.Update();
+            lvPlugins.EndUpdate();
+            //lvPlugins.Update();
         }
 
         void ListView_DragEnter(object sender, DragEventArgs e)
@@ -140,10 +151,11 @@ namespace Overunity
                         DataTable imported_files = fileImportHandlers.Where(x => file.Substring(file.Length - 4, 4) == x.Item1).First().Item3.Import(file, strPluginTable_Schema);
                         foreach (DataRow dr in imported_files.Rows)
                         {
-                            dsActivePlugins.Tables["ActivePlugins"].ImportRow(dr);
+                            dsPlugins.Tables["ActivePlugins"].ImportRow(dr);
                         }
                     }
 
+                    dsPlugins.Tables["ActivePlugins"].AcceptChanges();
                     ListView_Update();
                 }
                 catch (Exception ex)
@@ -153,6 +165,29 @@ namespace Overunity
                 }
 
             }
+        }
+
+        private void ListView_ColumnClick(object sender, ColumnClickEventArgs e)
+        {
+            Int32 colIndex = Convert.ToInt32(e.Column.ToString());
+            lvPlugins.Columns[colIndex].Text = "new text";
+        }
+
+        private void ListView_Resize(object sender, EventArgs e)
+        {
+            bool scrollbar_visible = false;
+            if ((lvPlugins.Items.Count > 0) && (ActiveForm != null))
+                scrollbar_visible = ((lvPlugins.GetItemRect(0).Height * (lvPlugins.Items.Count + 2)) > lvPlugins.Bounds.Height);
+
+            lvPlugins.BeginUpdate();
+            foreach (ColumnHeader col in lvPlugins.Columns)
+            {
+                if (scrollbar_visible)
+                    col.Width = (lvPlugins.Width / lvPlugins.Columns.Count) - (System.Windows.Forms.SystemInformation.VerticalScrollBarWidth / lvPlugins.Columns.Count) - 2;
+                else
+                    col.Width = (lvPlugins.Width / lvPlugins.Columns.Count) - 2;
+            }
+            lvPlugins.EndUpdate();
         }
     }
 }

@@ -19,6 +19,12 @@ namespace Overunity.Handlers
             StringReader sReader = new StringReader(tableFormat);
             tblTmp.ReadXmlSchema(sReader);
 
+            DataRow row = tblTmp.NewRow();
+            row["Plugin Name"] = new FileInfo(filePath).Name;
+            tblTmp.Rows.Add(row);
+
+            tblTmp.AcceptChanges();
+
             return tblTmp;
         }
     }
