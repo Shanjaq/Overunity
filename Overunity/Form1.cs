@@ -16,6 +16,7 @@ namespace Overunity
     public partial class Form1 : Form
     {
         ListView lvPlugins;
+        ContextMenu cmPlugins;
 
         DataSet dsPlugins = new DataSet();
         DataView dvActivePlugins;
@@ -29,6 +30,30 @@ namespace Overunity
         }
 
         private void Form1_Load(object sender, EventArgs e)
+        {
+            Data_Init();
+
+            ListView_Init();
+
+            ContextMenu_Init();
+
+            Panel pMain = new Panel
+            {
+                Name = "Panel_Main",
+                Location = new System.Drawing.Point(0, 0),
+                Size = new System.Drawing.Size(245, 200),
+                Anchor = AnchorStyles.Top | AnchorStyles.Right | AnchorStyles.Bottom | AnchorStyles.Left,
+                Dock = DockStyle.Fill,
+                Padding = new Padding(0, 0, 0, 64)
+            };
+
+            Controls.Add(pMain);
+            pMain.Controls.Add(lvPlugins);
+
+        }
+
+        #region DATA
+        private void Data_Init()
         {
             DataTable dtActivePlugins = new DataTable("ActivePlugins");
             dtActivePlugins.Columns.Add("Plugin Name", typeof(string));
@@ -51,6 +76,17 @@ namespace Overunity
                                                             select row;
             dvActivePlugins = pluginsQuery.AsDataView();
 
+            fileImportHandlers = new List<Tuple<string, string, IHandler>>() {
+                Tuple.Create( ".esp", "Plugin", (IHandler)new PluginHandler()),
+                Tuple.Create( ".esm", "Master", (IHandler)new PluginHandler()),
+                Tuple.Create( ".ess", "Save", (IHandler)new SaveHandler())
+            };
+        }
+        #endregion
+
+        #region LISTVIEW
+        void ListView_Init()
+        {
             lvPlugins = new ListView
             {
                 Name = "ListView_Plugins",
@@ -72,40 +108,12 @@ namespace Overunity
             lvPlugins.DragEnter += new DragEventHandler(ListView_DragEnter);
             lvPlugins.ColumnClick += new ColumnClickEventHandler(ListView_ColumnClick);
             lvPlugins.Resize += new EventHandler(ListView_Resize);
+            lvPlugins.MouseUp += new MouseEventHandler(ListView_MouseClick);
 
-
-            foreach (DataColumn dc in dtActivePlugins.Columns)
-            {
+            foreach (DataColumn dc in dsPlugins.Tables["ActivePlugins"].Columns)
                 lvPlugins.Columns.Add(dc.Caption);
-            }
-
-            //Controls.Add(lvPlugins);
-
-            Panel pMain = new Panel
-            {
-                Name = "Panel_Main",
-                Location = new System.Drawing.Point(0, 0),
-                Size = new System.Drawing.Size(245, 200),
-                Anchor = AnchorStyles.Top | AnchorStyles.Right | AnchorStyles.Bottom | AnchorStyles.Left,
-                Dock = DockStyle.Fill,
-                Padding = new Padding(0, 0, 0, 64)
-            };
-
-            Controls.Add(pMain);
-            pMain.Controls.Add(lvPlugins);
-
-            int j = 0;
-            j += 1;
 
             ListView_Update();
-
-            j += 1;
-
-            fileImportHandlers = new List<Tuple<string, string, IHandler>>() {
-                Tuple.Create( ".esp", "Plugin", (IHandler)new PluginHandler()),
-                Tuple.Create( ".esm", "Master", (IHandler)new PluginHandler()),
-                Tuple.Create( ".ess", "Save", (IHandler)new SaveHandler())
-            };
         }
 
         void ListView_Update()
@@ -189,5 +197,92 @@ namespace Overunity
             }
             lvPlugins.EndUpdate();
         }
+
+        private void ListView_MouseClick(object sender, MouseEventArgs e)
+        {
+            string id = "xxx";//extra value
+
+            if (e.Button == MouseButtons.Right)
+            {
+                if (lvPlugins.FocusedItem != null && lvPlugins.FocusedItem.Bounds.Contains(e.Location) == true)
+                {
+                    cmPlugins.Show(lvPlugins, new Point(e.X, e.Y));
+                }
+            }
+        }
+        #endregion
+
+        #region CONTEXT MENU
+        private void ContextMenu_Init()
+        {
+            cmPlugins = new ContextMenu();
+            List<Tuple<string, Action<object, EventArgs>>> menu_items = new List<Tuple<string, Action<object, EventArgs>>>
+            {
+                Tuple.Create("Description", new Action<object, EventArgs>(Context_Description)),
+                Tuple.Create("Set to Load Last", new Action<object, EventArgs>(Context_Description)),
+                Tuple.Create("Remove from Active Plugins", new Action<object, EventArgs>(Context_Remove)),
+                Tuple.Create("Uninstall Selected", new Action<object, EventArgs>(Context_Description)),
+                Tuple.Create("Clear Active Plugin List", new Action<object, EventArgs>(Context_Description)),
+                Tuple.Create("-", new Action<object, EventArgs>(Context_Description)),
+                Tuple.Create("Find Multiple Versions", new Action<object, EventArgs>(Context_Description)),
+                Tuple.Create("Find String in Plugins", new Action<object, EventArgs>(Context_Description)),
+                Tuple.Create("-", new Action<object, EventArgs>(Context_Description)),
+                Tuple.Create("Scan for Missing Resources", new Action<object, EventArgs>(Context_Description)),
+                Tuple.Create("Scan for Shared Resources", new Action<object, EventArgs>(Context_Description)),
+                Tuple.Create("Compile for Distribution", new Action<object, EventArgs>(Context_Description)),
+                Tuple.Create("Export Object Definitions", new Action<object, EventArgs>(Context_Description)),
+            };
+
+            foreach (Tuple<string, Action<object, EventArgs>> menu_item in menu_items)
+            {
+
+                MenuItem menuItem = new MenuItem(menu_item.Item1);
+                menuItem.Click += delegate (object sender2, EventArgs e2) {
+                    menu_item.Item2(lvPlugins, e2);
+                };
+                cmPlugins.MenuItems.Add(menuItem);
+            }
+        }
+
+        private void Context_Remove(object sender, EventArgs e)
+        {
+            ListView ListViewControl = sender as ListView;
+            foreach (ListViewItem eachItem in ListViewControl.SelectedItems)
+            {
+                // you can use this idea to get the ListView header's name is 'Id' before delete
+                Console.WriteLine(GetTextByHeaderAndIndex(ListViewControl, "Id", eachItem.Index));
+                ListViewControl.Items.Remove(eachItem);
+            }
+        }
+
+        private void Context_Description(object sender, EventArgs e)
+        {
+            //id is extra value when you need or delete it
+            ListView ListViewControl = sender as ListView;
+            foreach (ListViewItem tmpLstView in ListViewControl.SelectedItems)
+            {
+                Console.WriteLine(tmpLstView.Text);
+            }
+
+        }
+
+        public static string GetTextByHeaderAndIndex(ListView listViewControl, string headerName, int index)
+        {
+            int headerIndex = -1;
+            foreach (ColumnHeader header in listViewControl.Columns)
+            {
+                if (header.Name == headerName)
+                {
+                    headerIndex = header.Index;
+                    break;
+                }
+            }
+            if (headerIndex > -1)
+            {
+                return listViewControl.Items[index].SubItems[headerIndex].Text;
+            }
+            return null;
+        }
+        #endregion
     }
 }
