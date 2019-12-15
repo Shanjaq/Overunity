@@ -56,13 +56,13 @@ namespace Overunity
         private void Data_Init()
         {
             DataTable dtActivePlugins = new DataTable("ActivePlugins");
+            dtActivePlugins.Columns.Add("Id", typeof(Guid));
             dtActivePlugins.Columns.Add("Priority", typeof(int));
             dtActivePlugins.Columns.Add("FullPath", typeof(string));
             dtActivePlugins.Columns.Add("PluginName", typeof(string));
             dtActivePlugins.Columns.Add("DateModified", typeof(DateTime));
             dtActivePlugins.Columns.Add("Size", typeof(int));
             dtActivePlugins.Columns.Add("Author", typeof(string));
-            dtActivePlugins.Columns.Add("Description", typeof(int));
 
             dsPlugins.Tables.Add(dtActivePlugins);
 
@@ -90,6 +90,14 @@ namespace Overunity
                 Tuple.Create( ".ess", "Save", (IHandler)new SaveHandler())
             };
         }
+
+        private DataTable Get_Rows(List<string> Ids)
+        {
+            return dsPlugins.Tables["ActivePlugins"].AsEnumerable()
+                .Where(x => Ids.Contains(x.Field<object>("Id").ToString()))
+                .Select(y => y)
+                .CopyToDataTable();
+        }
         #endregion
 
         #region LISTVIEW
@@ -104,7 +112,6 @@ namespace Overunity
                 AllowColumnReorder = true,
                 LabelEdit = false,
                 FullRowSelect = true,
-                Sorting = SortOrder.Ascending,
                 View = View.Details,
                 HeaderStyle = ColumnHeaderStyle.Clickable,
                 AllowDrop = true,
@@ -118,17 +125,26 @@ namespace Overunity
             lvPlugins.Resize += new EventHandler(ListView_Resize);
             lvPlugins.MouseUp += new MouseEventHandler(ListView_MouseClick);
 
-            foreach (DataColumn dc in dsPlugins.Tables["ActivePlugins"].Columns)
+            foreach (DataColumn dc in dvActivePlugins.ToTable(true, "PluginName", "DateModified", "Author", "Size", "Priority", "Id").Columns)
                 lvPlugins.Columns.Add(dc.Caption);
 
+            lvPlugins.Columns[5].Dispose(); // hide Id column
             ListView_Update();
         }
 
         void ListView_Update()
         {
+            int topItemIndex = 0;
+            try
+            {
+                topItemIndex = lvPlugins.TopItem.Index;
+            }
+            catch (Exception ex)
+            { }
+
             lvPlugins.BeginUpdate();
             lvPlugins.Items.Clear();
-            foreach (DataRow dr in dvActivePlugins.ToTable().Rows)
+            foreach (DataRow dr in dvActivePlugins.ToTable(true, "PluginName", "DateModified", "Author", "Size", "Priority", "Id").Rows)
             {
                 ListViewItem lvi = new ListViewItem(dr.ItemArray.First().ToString());
 
@@ -144,7 +160,13 @@ namespace Overunity
                 lvPlugins.Items.Add(lvi);
             }
             lvPlugins.EndUpdate();
-            //lvPlugins.Update();
+
+            try
+            {
+                lvPlugins.TopItem = lvPlugins.Items[topItemIndex];
+            }
+            catch (Exception ex)
+            { }
         }
 
         void ListView_DragEnter(object sender, DragEventArgs e)
@@ -186,7 +208,12 @@ namespace Overunity
         private void ListView_ColumnClick(object sender, ColumnClickEventArgs e)
         {
             Int32 colIndex = Convert.ToInt32(e.Column.ToString());
-            lvPlugins.Columns[colIndex].Text = "new text";
+            EnumerableRowCollection<DataRow> pluginsQuery = dsPlugins.Tables["ActivePlugins"].AsEnumerable()
+                .OrderBy(y => y.Field<object>(lvPlugins.Columns[colIndex].Text))
+                .Select(y => y);
+
+            dvActivePlugins = pluginsQuery.AsDataView();
+            ListView_Update();
         }
 
         private void ListView_Resize(object sender, EventArgs e)
@@ -263,12 +290,15 @@ namespace Overunity
 
         private void Context_Description(object sender, EventArgs e)
         {
-            //id is extra value when you need or delete it
+            List<string> Ids = new List<string>();
             ListView ListViewControl = sender as ListView;
+
             foreach (ListViewItem tmpLstView in ListViewControl.SelectedItems)
-            {
-                Console.WriteLine(tmpLstView.Text);
-            }
+                Ids.Add(tmpLstView.SubItems[5].Text); // hidden column
+
+            foreach (DataRow dr in Get_Rows(Ids).Rows)
+                MessageBox.Show(dr.ItemArray[2].ToString());
+
 
         }
 

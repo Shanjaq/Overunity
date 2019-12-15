@@ -71,6 +71,7 @@ namespace Overunity.Handlers
             row["DateModified"] = fi.LastWriteTime;
             row["Author"] = pluginAuthor;
             row["Size"] = fi.Length;
+            row["Id"] = Guid.NewGuid();
             tblTmp.Rows.Add(row);
 
             tblTmp.AcceptChanges();
