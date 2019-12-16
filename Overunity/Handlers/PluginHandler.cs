@@ -34,6 +34,7 @@ namespace Overunity.Handlers
             fs.Read(header, 0, fileHeaderSize);
 
             string fieldName = "";
+            int fieldLength = 0;
 
             //plugin header
             if (fileSignature == "TES3")
@@ -53,14 +54,18 @@ namespace Overunity.Handlers
                         else if(fileSignature == "TES4")
                         {
                             fieldName = System.Text.Encoding.UTF8.GetString(header, 42, 4);
-                            int fieldLength = BitConverter.ToInt16(header, 46); ;
+                            fieldLength = BitConverter.ToInt16(header, 46);
 
-                            pluginAuthor = System.Text.Encoding.UTF8.GetString(header, 48, fieldLength).Trim('\0');
+                            if (fieldName == "CNAM")
+                                pluginAuthor = System.Text.Encoding.UTF8.GetString(header, 48, fieldLength).Trim('\0');
+
                             break;
                         }
                         break;
                     }
             }
+
+            fs.Close();
 
             DataTable tblTmp = new DataTable();
             StringReader sReader = new StringReader(tableFormat);

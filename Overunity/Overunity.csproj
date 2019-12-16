@@ -60,6 +60,7 @@
     <Compile Include="Handlers\PluginHandler.cs" />
     <Compile Include="Handlers\SaveHandler.cs" />
     <Compile Include="Program.cs" />
+    <Compile Include="Prompt.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <EmbeddedResource Include="Form1.resx">
       <DependentUpon>Form1.cs</DependentUpon>

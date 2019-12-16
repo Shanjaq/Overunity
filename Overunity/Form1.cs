@@ -17,6 +17,9 @@ namespace Overunity
     {
         ListView lvPlugins;
         ContextMenu cmPlugins;
+        ListViewItem heldDownItem;
+        Point heldDownPoint;
+        int columnLastSorted = 0;
 
         DataSet dsPlugins = new DataSet();
         DataView dvActivePlugins;
@@ -63,6 +66,7 @@ namespace Overunity
             dtActivePlugins.Columns.Add("DateModified", typeof(DateTime));
             dtActivePlugins.Columns.Add("Size", typeof(int));
             dtActivePlugins.Columns.Add("Author", typeof(string));
+            dtActivePlugins.PrimaryKey = new[] { dtActivePlugins.Columns["FullPath"] };
 
             dsPlugins.Tables.Add(dtActivePlugins);
 
@@ -91,12 +95,11 @@ namespace Overunity
             };
         }
 
-        private DataTable Get_Rows(List<string> Ids)
+        private EnumerableRowCollection<DataRow> Get_Rows(List<string> Ids)
         {
             return dsPlugins.Tables["ActivePlugins"].AsEnumerable()
                 .Where(x => Ids.Contains(x.Field<object>("Id").ToString()))
-                .Select(y => y)
-                .CopyToDataTable();
+                .Select(y => y);
         }
         #endregion
 
@@ -129,6 +132,12 @@ namespace Overunity
                 lvPlugins.Columns.Add(dc.Caption);
 
             lvPlugins.Columns[5].Dispose(); // hide Id column
+
+            typeof(Control).GetProperty("DoubleBuffered",
+                                         System.Reflection.BindingFlags.NonPublic |
+                                         System.Reflection.BindingFlags.Instance)
+                           .SetValue(lvPlugins, true, null);
+
             ListView_Update();
         }
 
@@ -177,6 +186,8 @@ namespace Overunity
         void ListView_DragDrop(object sender, DragEventArgs e)
         {
             // Handle FileDrop data.
+
+            DataTable dtActivePlugins = dsPlugins.Tables["ActivePlugins"];
             if (e.Data.GetDataPresent(DataFormats.FileDrop))
             {
                 string[] files = (string[])e.Data.GetData(DataFormats.FileDrop);
@@ -188,18 +199,16 @@ namespace Overunity
 
                         DataTable imported_files = fileHandlers.Where(x => file.Substring(file.Length - 4, 4) == x.Item1).First().Item3.Import(file, strPluginTable_Schema);
                         foreach (DataRow dr in imported_files.Rows)
-                        {
-                            dsPlugins.Tables["ActivePlugins"].ImportRow(dr);
-                        }
+                            if (!dtActivePlugins.Rows.Contains(dr["FullPath"]))
+                                dtActivePlugins.ImportRow(dr);
                     }
 
-                    dsPlugins.Tables["ActivePlugins"].AcceptChanges();
+                    dtActivePlugins.AcceptChanges();
                     ListView_Update();
                 }
                 catch (Exception ex)
                 {
                     MessageBox.Show(ex.Message);
-                    return;
                 }
 
             }
@@ -208,9 +217,21 @@ namespace Overunity
         private void ListView_ColumnClick(object sender, ColumnClickEventArgs e)
         {
             Int32 colIndex = Convert.ToInt32(e.Column.ToString());
-            EnumerableRowCollection<DataRow> pluginsQuery = dsPlugins.Tables["ActivePlugins"].AsEnumerable()
-                .OrderBy(y => y.Field<object>(lvPlugins.Columns[colIndex].Text))
-                .Select(y => y);
+            EnumerableRowCollection<DataRow> pluginsQuery;
+            if (colIndex != columnLastSorted)
+            {
+                pluginsQuery = dsPlugins.Tables["ActivePlugins"].AsEnumerable()
+                    .OrderBy(y => y.Field<object>(lvPlugins.Columns[colIndex].Text))
+                    .Select(y => y);
+                columnLastSorted = colIndex;
+            }
+            else
+            {
+                pluginsQuery = dsPlugins.Tables["ActivePlugins"].AsEnumerable()
+                    .OrderByDescending(y => y.Field<object>(lvPlugins.Columns[colIndex].Text))
+                    .Select(y => y);
+                columnLastSorted = 0;
+            }
 
             dvActivePlugins = pluginsQuery.AsDataView();
             ListView_Update();
@@ -255,15 +276,16 @@ namespace Overunity
                 Tuple.Create("Set to Load Last", new Action<object, EventArgs>(Context_Description)),
                 Tuple.Create("Remove from Active Plugins", new Action<object, EventArgs>(Context_Remove)),
                 Tuple.Create("Uninstall Selected", new Action<object, EventArgs>(Context_Description)),
-                Tuple.Create("Clear Active Plugin List", new Action<object, EventArgs>(Context_Description)),
+                Tuple.Create("Clear Active Plugin List", new Action<object, EventArgs>(Context_RemoveAll)),
                 Tuple.Create("-", new Action<object, EventArgs>(Context_Description)),
                 Tuple.Create("Find Multiple Versions", new Action<object, EventArgs>(Context_Description)),
-                Tuple.Create("Find String in Plugins", new Action<object, EventArgs>(Context_Description)),
+                Tuple.Create("Find String in Plugins", new Action<object, EventArgs>(Context_FindString)),
                 Tuple.Create("-", new Action<object, EventArgs>(Context_Description)),
                 Tuple.Create("Scan for Missing Resources", new Action<object, EventArgs>(Context_Description)),
                 Tuple.Create("Scan for Shared Resources", new Action<object, EventArgs>(Context_Description)),
                 Tuple.Create("Compile for Distribution", new Action<object, EventArgs>(Context_Description)),
                 Tuple.Create("Export Object Definitions", new Action<object, EventArgs>(Context_Description)),
+                Tuple.Create("Merge Leveled Lists", new Action<object, EventArgs>(Context_Description)),
             };
 
             foreach (Tuple<string, Action<object, EventArgs>> menu_item in menu_items)
@@ -280,44 +302,57 @@ namespace Overunity
         private void Context_Remove(object sender, EventArgs e)
         {
             ListView ListViewControl = sender as ListView;
-            foreach (ListViewItem eachItem in ListViewControl.SelectedItems)
-            {
-                // you can use this idea to get the ListView header's name is 'Id' before delete
-                Console.WriteLine(GetTextByHeaderAndIndex(ListViewControl, "Id", eachItem.Index));
-                ListViewControl.Items.Remove(eachItem);
-            }
-        }
-
-        private void Context_Description(object sender, EventArgs e)
-        {
             List<string> Ids = new List<string>();
-            ListView ListViewControl = sender as ListView;
 
             foreach (ListViewItem tmpLstView in ListViewControl.SelectedItems)
                 Ids.Add(tmpLstView.SubItems[5].Text); // hidden column
 
-            foreach (DataRow dr in Get_Rows(Ids).Rows)
+
+            List<DataRow> toRemove = Get_Rows(Ids).ToList();
+
+            foreach (DataRow dr in toRemove)
+                dsPlugins.Tables["ActivePlugins"].Rows.Remove(dr);
+
+            ListView_Update();
+        }
+
+        private void Context_RemoveAll(object sender, EventArgs e)
+        {
+            ListView ListViewControl = sender as ListView;
+            List<string> Ids = new List<string>();
+
+            foreach (ListViewItem tmpLstView in ListViewControl.Items)
+                Ids.Add(tmpLstView.SubItems[5].Text); // hidden column
+
+
+            List<DataRow> toRemove = Get_Rows(Ids).ToList();
+
+            foreach (DataRow dr in toRemove)
+                dsPlugins.Tables["ActivePlugins"].Rows.Remove(dr);
+
+            ListView_Update();
+        }
+
+        private void Context_Description(object sender, EventArgs e)
+        {
+            ListView ListViewControl = sender as ListView;
+            List<string> Ids = new List<string>();
+
+            foreach (ListViewItem tmpLstView in ListViewControl.SelectedItems)
+                Ids.Add(tmpLstView.SubItems[5].Text); // hidden column
+
+            foreach (DataRow dr in Get_Rows(Ids))
                 MessageBox.Show(dr.ItemArray[2].ToString());
 
 
         }
 
-        public static string GetTextByHeaderAndIndex(ListView listViewControl, string headerName, int index)
+        private void Context_FindString(object sender, EventArgs e)
         {
-            int headerIndex = -1;
-            foreach (ColumnHeader header in listViewControl.Columns)
+            using (Prompt prompt = new Prompt(@"Enter string (case sensitive) to find in all active plugins", "Find String in Plugins"))
             {
-                if (header.Name == headerName)
-                {
-                    headerIndex = header.Index;
-                    break;
-                }
+                string result = prompt.Result;
             }
-            if (headerIndex > -1)
-            {
-                return listViewControl.Items[index].SubItems[headerIndex].Text;
-            }
-            return null;
         }
         #endregion
     }
