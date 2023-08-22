@@ -8,7 +8,7 @@
     <OutputType>WinExe</OutputType>
     <RootNamespace>Overunity</RootNamespace>
     <AssemblyName>Overunity</AssemblyName>
-    <TargetFrameworkVersion>v5.0.17</TargetFrameworkVersion>
+    <TargetFrameworkVersion>v3.1.32</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
     <Deterministic>true</Deterministic>
