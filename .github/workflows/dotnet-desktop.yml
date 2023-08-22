@@ -119,4 +119,4 @@ jobs:
       uses: actions/upload-artifact@v3
       with:
         name: dotnet-results-${{ matrix.dotnet-version }}
-        path: ${{ matrix.configuration }}\Overunity.exe
+        path: ${{ github.workspace }}\Overunity\bin\${{ matrix.configuration }}\Overunity.exe
