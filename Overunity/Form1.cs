@@ -76,6 +76,7 @@ namespace Overunity
 
             // Create a LinqDataView from a LINQ to DataSet query and bind it 
             // to the Windows forms control.
+            // TEST
             /*EnumerableRowCollection<DataRow> pluginsQuery = from row in dtActivePlugins.AsEnumerable()
                                                             where row.Field<string>("PluginName") != null
                                                             orderby row.Field<string>("PluginName")
